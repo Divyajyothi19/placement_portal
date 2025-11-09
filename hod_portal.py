@@ -1,4 +1,11 @@
-# pages/hod_portal.py
+# ---------------------- PATH FIX ----------------------
+import os, sys
+HERE = os.path.dirname(__file__)
+REPO_ROOT = os.path.abspath(os.path.join(HERE, ".."))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
+# ---------------------- IMPORTS ----------------------
 import streamlit as st
 import pandas as pd
 import sqlite3
@@ -82,13 +89,13 @@ else:
 
     st.write("### ✅ Placed Students")
     if not placed_df.empty:
-        st.dataframe(placed_df, use_container_width=True)
+        st.dataframe(placed_df, width='stretch')
     else:
         st.warning("No placed students yet.")
 
     st.write("### 🚫 Unplaced Students")
     if not unplaced_df.empty:
-        st.dataframe(unplaced_df, use_container_width=True)
+        st.dataframe(unplaced_df, width='stretch')
     else:
         st.success("🎉 All students placed!")
 
@@ -117,7 +124,7 @@ st.subheader("🏢 Top Recruiters")
 top_recs = get_top_recruiters(department)
 if top_recs:
     rec_df = pd.DataFrame(top_recs, columns=["Company", "Students Placed", "Avg Package (LPA)"])
-    st.dataframe(rec_df, use_container_width=True)
+    st.dataframe(rec_df, width='stretch')
 else:
     st.info("No recruiters have been added yet for this department.")
 
@@ -131,22 +138,21 @@ if skill_insight:
 else:
     st.info("Skill gap insights not available yet.")
 
-# ---------------------- AI ASSISTANT (BUILT-IN CHAT) ----------------------
+# ---------------------- AI ASSISTANT ----------------------
 st.markdown("---")
 st.subheader("🤖 AI Placement Assistant")
 
 with st.expander("💬 Chat with AI Assistant"):
     user_input = st.text_input("Ask about placement performance, improvements, or recruiter stats:")
     if user_input:
-        # Simulated small AI assistant
         if "placement" in user_input.lower():
             st.write("📊 The department placement rate is improving steadily this semester.")
         elif "recruiter" in user_input.lower():
             st.write("🏢 Top recruiters this year are Infosys, TCS, and Wipro.")
         elif "skill" in user_input.lower():
-            st.write("🧠 Most students should improve in 'Data Visualization' and 'SQL' skills.")
+            st.write("🧠 Students should focus on Data Visualization and SQL skills.")
         else:
-            st.write("🤖 I suggest focusing on technical projects and resume keywords to boost placement chances.")
+            st.write("🤖 Try improving resumes with project-based learning and certifications.")
 
 # ---------------------- AI SUMMARY & PDF ----------------------
 st.markdown("---")
