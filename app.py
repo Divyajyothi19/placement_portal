@@ -1,7 +1,6 @@
-# app.py (fixed - safe redirect + robust sidebar links)
 import streamlit as st
-import streamlit.components.v1 as components
 from database import init_db, authenticate_user
+import time
 
 # ---------------------- PAGE CONFIG ----------------------
 st.set_page_config(
@@ -97,34 +96,25 @@ with col2:
         else:
             user = authenticate_user(username, password, role)
             if user:
-                # Save login info
                 st.session_state['logged_in'] = True
                 st.session_state['username'] = username
                 st.session_state['role'] = role
 
-                # Map role -> page path under pages/
+                # ✅ Redirect page setup
                 if role == 'Admin':
-                    target_page = 'pages/admin_portal.py'
+                    redirect_page = 'pages/admin_portal.py'
                 elif role == 'HOD':
-                    target_page = 'pages/hod_portal.py'
+                    redirect_page = 'pages/hod_portal.py'
+                elif role == 'Student':
+                    redirect_page = 'pages/student_portal.py'
                 else:
-                    target_page = 'pages/student_portal.py'
+                    redirect_page = None
 
-                st.success('✅ Login successful! Redirecting you now...')
-
-                # Perform client-side redirect to the Streamlit multi-page URL param.
-                # This is version-tolerant and works in Cloud & local multi-page setups.
-                js = f"""
-                <script>
-                // set the ?page=... query parameter and reload
-                const params = new URLSearchParams(window.location.search);
-                params.set('page', '{target_page}');
-                const newUrl = window.location.pathname + '?' + params.toString();
-                window.location.href = newUrl;
-                </script>
-                """
-                components.html(js, height=0)
-                st.stop()  # stop server-side execution while browser redirects
+                if redirect_page:
+                    st.success('✅ Login successful! Redirecting...')
+                    with st.spinner("Redirecting, please wait..."):
+                        time.sleep(2)
+                        st.switch_page(redirect_page)
             else:
                 st.error('❌ Invalid username or password. Contact Placement Cell.')
 
@@ -136,23 +126,16 @@ st.sidebar.title('📌 Navigation')
 if 'logged_in' in st.session_state and st.session_state['logged_in']:
     st.sidebar.success(f'👋 Welcome, {st.session_state["username"]} ({st.session_state["role"]})')
 
-    # Add links, but guard them so missing page metadata doesn't raise on some platforms
-    try:
-        if st.session_state['role'] == 'Student':
-            st.sidebar.page_link('pages/student_portal.py', label='🎓 Student Portal')
-        elif st.session_state['role'] == 'HOD':
-            st.sidebar.page_link('pages/hod_portal.py', label='👨‍🏫 HOD Dashboard')
-        elif st.session_state['role'] == 'Admin':
-            st.sidebar.page_link('pages/admin_portal.py', label='👩‍💼 Admin Dashboard')
-            st.sidebar.page_link('pages/drive_portal.py', label='🚀 Drive Portal')
-    except Exception:
-        # If page_link fails (some deployment environments), fallback to instructions
-        st.sidebar.info("Pages are available in the sidebar when deployed. If you see this, click the navigation buttons manually.")
+    if st.session_state['role'] == 'Student':
+        st.sidebar.page_link('pages/student_portal.py', label='🎓 Student Portal')
+    elif st.session_state['role'] == 'HOD':
+        st.sidebar.page_link('pages/hod_portal.py', label='👨‍🏫 HOD Dashboard')
+    elif st.session_state['role'] == 'Admin':
+        st.sidebar.page_link('pages/admin_portal.py', label='👩‍💼 Admin Dashboard')
+        st.sidebar.page_link('pages/drives_portal.py', label='🚀 Drive Portal')
 
-    # Logout button
     if st.sidebar.button('🚪 Logout'):
-        for k in list(st.session_state.keys()):
-            del st.session_state[k]
-        st.experimental_rerun()
+        st.session_state.clear()
+        st.rerun()
 else:
     st.sidebar.info('🔑 Please log in to access your portal.')
