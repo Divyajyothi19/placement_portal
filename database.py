@@ -7,12 +7,15 @@ from collections import Counter
 
 DB_FILE = "placement_portal.db"
 
-# ---------------------- INITIALIZE DB ----------------------
+# =======================================================================
+#                         DATABASE INITIALIZATION
+# =======================================================================
+
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
 
-    # Users
+    # Users table
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -23,7 +26,7 @@ def init_db():
         )
     ''')
 
-    # Resume analysis
+    # Resume Analysis
     c.execute('''
         CREATE TABLE IF NOT EXISTS resume_analysis (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,7 +37,7 @@ def init_db():
         )
     ''')
 
-    # Student profiles
+    # Student Profiles
     c.execute('''
         CREATE TABLE IF NOT EXISTS student_profiles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,7 +60,7 @@ def init_db():
         )
     ''')
 
-    # Ensure default admin
+    # Default admin
     c.execute("SELECT * FROM users WHERE username='admin'")
     if not c.fetchone():
         c.execute("INSERT INTO users (username, password, role, department) VALUES (?, ?, ?, ?)",
@@ -67,7 +70,11 @@ def init_db():
     conn.commit()
     conn.close()
 
-# ---------------------- AUTH ----------------------
+
+# =======================================================================
+#                         AUTHENTICATION
+# =======================================================================
+
 def authenticate_user(username, password, role):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -76,7 +83,76 @@ def authenticate_user(username, password, role):
     conn.close()
     return user
 
-# ---------------------- RESUME ANALYSIS ----------------------
+
+# =======================================================================
+#                         AUTO USER CREATION
+# =======================================================================
+
+def add_auto_user(role, department=None):
+    """Automatically create users; department required for HOD and unique per dept."""
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+
+    def generate_username(role):
+        prefix = role[:3].upper()
+        random_num = ''.join(random.choices(string.digits, k=4))
+        return f"{prefix}{random_num}"
+
+    def generate_password(length=8):
+        return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+
+    # HOD must have a department and unique per dept
+    if role == "HOD":
+        if not department:
+            conn.close()
+            return None, "⚠️ Department is required when creating a HOD account."
+        c.execute("SELECT * FROM users WHERE role='HOD' AND department=?", (department,))
+        if c.fetchone():
+            conn.close()
+            return None, f"⚠️ HOD already exists for '{department}' department."
+
+    username = generate_username(role)
+    password = generate_password()
+
+    c.execute("INSERT INTO users (username, password, role, department) VALUES (?, ?, ?, ?)",
+              (username, password, role, department))
+    conn.commit()
+    conn.close()
+    return (username, password), f"✅ {role} account created successfully."
+
+
+# =======================================================================
+#                         USERS & EXPORTS
+# =======================================================================
+
+def get_all_users():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT id, username, password, role, department FROM users ORDER BY id DESC")
+    data = c.fetchall()
+    conn.close()
+    return data
+
+
+def export_users_to_csv(filename="all_users_export.csv"):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT id, username, password, role, department FROM users ORDER BY id DESC")
+    rows = c.fetchall()
+    conn.close()
+
+    with open(filename, "w", newline='', encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["id", "username", "password", "role", "department"])
+        writer.writerows(rows)
+
+    return filename
+
+
+# =======================================================================
+#                         RESUME ANALYSIS
+# =======================================================================
+
 def save_resume_analysis(username, score, feedback, skills):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -84,6 +160,7 @@ def save_resume_analysis(username, score, feedback, skills):
               (username, score, feedback, ",".join(skills)))
     conn.commit()
     conn.close()
+
 
 def get_resume_analysis(username):
     conn = sqlite3.connect(DB_FILE)
@@ -96,7 +173,11 @@ def get_resume_analysis(username):
         return {"score": row[0], "feedback": row[1], "skills": row[2].split(",")}
     return None
 
-# ---------------------- STUDENT PROFILE ----------------------
+
+# =======================================================================
+#                         STUDENT PROFILES
+# =======================================================================
+
 def upsert_student_profile(username, reg_no=None, cgpa=None):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -112,10 +193,15 @@ def upsert_student_profile(username, reg_no=None, cgpa=None):
     conn.commit()
     conn.close()
 
-# ---------------------- DEPARTMENT ANALYTICS ----------------------
+
+# =======================================================================
+#                         ANALYTICS & REPORTS
+# =======================================================================
+
 def get_department_stats(department):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
+
     c.execute("SELECT COUNT(*) FROM users WHERE role='Student' AND department=?", (department,))
     total = c.fetchone()[0] or 0
 
@@ -145,7 +231,7 @@ def get_department_stats(department):
         "avg_cgpa_placed": round(avg_cgpa, 2)
     }
 
-# ---------------------- TOP RECRUITERS ----------------------
+
 def get_top_recruiters(department, top_n=5):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -162,7 +248,7 @@ def get_top_recruiters(department, top_n=5):
     conn.close()
     return [(r[0], int(r[1]), round(r[2] or 0, 2)) for r in rows]
 
-# ---------------------- SKILL GAP INSIGHTS ----------------------
+
 def get_skill_gap_insights(department, top_k=5):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
